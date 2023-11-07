@@ -148,8 +148,8 @@ module ActiveRecord
           m.register_type(/Array/) do |sql_type|
             Clickhouse::OID::Array.new(sql_type)
           end
-          m.register_type(/Bool/, Type::Boolean)
-          m.register_type(/UUID/, Clickhouse::OID::Uuid)
+          m.register_type(/Bool/, Type::Boolean.new)
+          m.register_type(/UUID/, Clickhouse::OID::Uuid.new)
         end
 
         def extract_limit(sql_type)
