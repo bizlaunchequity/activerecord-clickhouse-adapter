@@ -148,6 +148,14 @@ module ActiveRecord
         protected
 
         def table_structure(table_name)
+          @table_structure ||= {}
+          @table_structure[table_name] ||= get_table_structure(table_name)
+        end
+        alias_method :column_definitions, :table_structure
+
+        private
+
+        def get_table_structure(table_name)
           result = do_system_execute("DESCRIBE TABLE `#{table_name}`", table_name)
           data = result["data"]
 
@@ -155,9 +163,6 @@ module ActiveRecord
 
           raise ActiveRecord::StatementInvalid.new("Could not find table '#{table_name}'")
         end
-        alias_method :column_definitions, :table_structure
-
-        private
 
         # Extracts the value from a PostgreSQL column default definition.
         def extract_value_from_default(default)
