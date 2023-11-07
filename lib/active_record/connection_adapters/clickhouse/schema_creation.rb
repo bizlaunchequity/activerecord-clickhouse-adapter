@@ -5,11 +5,10 @@ require "active_record/connection_adapters/abstract/schema_creation"
 module ActiveRecord
   module ConnectionAdapters
     module Clickhouse
-      class SchemaCreation < ConnectionAdapters::SchemaCreation# :nodoc:
-
+      class SchemaCreation < ConnectionAdapters::SchemaCreation # :nodoc:
         def visit_AddColumnDefinition(o)
           sql = +"ADD COLUMN #{accept(o.column)}"
-          sql << " AFTER " + quote_column_name(o.column.options[:after]) if o.column.options.key?(:after)
+          sql << (" AFTER " + quote_column_name(o.column.options[:after])) if o.column.options.key?(:after)
           sql
         end
 
@@ -41,10 +40,10 @@ module ActiveRecord
             opts ||= options.options
           end
 
-          if opts.present?
-            create_sql << " ENGINE = #{opts}"
+          create_sql << if opts.present?
+            " ENGINE = #{opts}"
           else
-            create_sql << " ENGINE = Log()"
+            " ENGINE = Log()"
           end
 
           create_sql
@@ -81,7 +80,7 @@ module ActiveRecord
         end
 
         def visit_TableDefinition(o)
-          create_sql = +"CREATE#{table_modifier_in_create(o)} #{o.view ? "VIEW" : "TABLE"} "
+          create_sql = +"CREATE#{table_modifier_in_create(o)} #{o.view ? 'VIEW' : 'TABLE'} "
           create_sql << "IF NOT EXISTS " if o.if_not_exists
           create_sql << "#{quote_table_name(o.name)} "
           add_to_clause!(create_sql, o) if o.materialized
@@ -90,7 +89,7 @@ module ActiveRecord
           statements << accept(o.primary_keys) if o.primary_keys
           create_sql << "(#{statements.join(', ')})" if statements.present?
           # Attach options for only table or materialized view without TO section
-          add_table_options!(create_sql, o) if !o.view || o.view && o.materialized && !o.to
+          add_table_options!(create_sql, o) if !o.view || (o.view && o.materialized && !o.to)
           add_as_clause!(create_sql, o)
           create_sql
         end
@@ -120,7 +119,7 @@ module ActiveRecord
         end
 
         def current_database
-          if ActiveRecord::version >= Gem::Version.new('6')
+          if ActiveRecord.version >= Gem::Version.new("6")
             ActiveRecord::Base.connection_db_config.database
           else
             ActiveRecord::Base.connection_config[:database]

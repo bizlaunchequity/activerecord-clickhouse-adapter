@@ -32,7 +32,7 @@ module ActiveRecord
       else
         port = config[:port] || 8123
         connection = {
-          host: config[:host] || 'localhost',
+          host: config[:host] || "localhost",
           port: port,
           ssl: config[:ssl].present? ? config[:ssl] : port == 443,
           sslca: config[:sslca],
@@ -74,7 +74,8 @@ module ActiveRecord
       def is_view
         @is_view || false
       end
-       # @param [Boolean] value
+
+      # @param [Boolean] value
       def is_view=(value)
         @is_view = value
       end
@@ -364,13 +365,14 @@ module ActiveRecord
       end
 
       def change_column_null(table_name, column_name, null, default = nil)
-        structure = table_structure(table_name).select{|v| v[0] == column_name.to_s}.first
+        structure = table_structure(table_name).select { |v| v[0] == column_name.to_s }.first
         raise "Column #{column_name} not found in table #{table_name}" if structure.nil?
-        change_column table_name, column_name, structure[1].gsub(/(Nullable\()?(.*?)\)?/, '\2'), {null: null, default: default}.compact
+
+        change_column table_name, column_name, structure[1].gsub(/(Nullable\()?(.*?)\)?/, '\2'), { null: null, default: default }.compact
       end
 
       def change_column_default(table_name, column_name, default)
-        change_column table_name, column_name, nil, {default: default}.compact
+        change_column table_name, column_name, nil, { default: default }.compact
       end
 
       def cluster
@@ -396,12 +398,12 @@ module ActiveRecord
       def database_engine_atomic?
         current_database_engine = "select engine from system.databases where name = '#{@config[:database]}'"
         res = select_one(current_database_engine)
-        res['engine'] == 'Atomic' if res
+        res["engine"] == "Atomic" if res
       end
 
       def apply_cluster(sql)
         if cluster
-          normalized_cluster_name = cluster.start_with?('{') ? "'#{cluster}'" : cluster
+          normalized_cluster_name = cluster.start_with?("{") ? "'#{cluster}'" : cluster
 
           "#{sql} ON CLUSTER #{normalized_cluster_name}"
         else
@@ -418,8 +420,7 @@ module ActiveRecord
       end
 
       def build_insert_sql(insert) # :nodoc:
-        sql = +"INSERT #{insert.into} #{insert.values_list}"
-        sql
+        +"INSERT #{insert.into} #{insert.values_list}"
       end
 
       # prevent formatting array to "--- []"
@@ -457,7 +458,7 @@ module ActiveRecord
       def apply_replica(table, options)
         if use_replica? && options[:options]
           if options[:options].match(/^Replicated/)
-            raise 'Do not try create Replicated table. It will be configured based on the *MergeTree engine.'
+            raise "Do not try create Replicated table. It will be configured based on the *MergeTree engine."
           end
 
           options[:options] = configure_replica(table, options[:options])
@@ -470,7 +471,7 @@ module ActiveRecord
         return options unless match
 
         if replica
-          engine_params = ([replica_path(table), replica].map { |v| "'#{v}'" } + [match[2].presence]).compact.join(', ')
+          engine_params = ([replica_path(table), replica].map { |v| "'#{v}'" } + [match[2].presence]).compact.join(", ")
         end
 
         "Replicated#{match[1]}(#{engine_params})#{match[3]}"

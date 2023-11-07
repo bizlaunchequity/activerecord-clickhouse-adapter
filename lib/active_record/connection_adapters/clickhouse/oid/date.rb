@@ -5,7 +5,6 @@ module ActiveRecord
     module Clickhouse
       module OID # :nodoc:
         class Date < Type::Date # :nodoc:
-
           def type_cast_from_database(value)
             value
           end
@@ -14,13 +13,12 @@ module ActiveRecord
           # hoping to remove it entirely.
           def type_cast_for_schema(value) # :nodoc:
             case value
-              when 'toDate(now()', 'CAST(now() AS Date)'
-                'now()'.inspect
-              else
-                value.inspect
+            when "toDate(now()", "CAST(now() AS Date)"
+              "now()".inspect
+            else
+              value.inspect
             end
           end
-
         end
       end
     end

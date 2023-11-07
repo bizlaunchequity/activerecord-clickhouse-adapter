@@ -18,7 +18,6 @@ module ActiveRecord
           def _limit
             DEFAULT_LIMIT
           end
-
         end
       end
     end
