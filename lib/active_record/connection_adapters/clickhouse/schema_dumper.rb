@@ -33,7 +33,7 @@ module ActiveRecord
             #
             # It's strongly recommended that you check this file into your version control system.
 
-            #{simple ? 'ActiveRecord' : 'ClickhouseActiverecord'}::Schema.define(#{define_params}) do
+            ActiveRecord::Schema[7.1].define(#{define_params}) do
 
           HEADER
         end
