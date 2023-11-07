@@ -1,0 +1,224 @@
+AllCops:
+  NewCops: enable
+  DisplayCopNames: true
+  TargetRubyVersion: 3.2.2
+  Exclude:
+    - lib/arel/visitors/clickhouse.rb
+
+Style/GlobalVars:
+  AllowedVariables:
+    - $redis
+    - $redis_client
+
+Style/Documentation:
+  Enabled: false
+
+Style/FrozenStringLiteralComment:
+  Enabled: false
+
+Style/StringLiterals:
+  EnforcedStyle: double_quotes
+
+Style/SymbolArray:
+  Enabled: false
+
+Style/WordArray:
+  Enabled: false
+
+Style/SymbolProc:
+  Exclude:
+    - 'app/admin/**/*'
+
+Style/ZeroLengthPredicate:
+  Enabled: false
+
+Style/NumericPredicate:
+  Enabled: false
+
+Style/RaiseArgs:
+  EnforcedStyle: compact
+
+Style/CaseEquality:
+  AllowOnConstant: true
+
+Style/DoubleNegation:
+  Enabled: false
+
+Style/RescueStandardError:
+  EnforcedStyle: implicit
+
+Style/BlockDelimiters:
+  EnforcedStyle: braces_for_chaining
+
+Style/Alias:
+  EnforcedStyle: prefer_alias_method
+
+Style/NestedTernaryOperator:
+  Enabled: false
+
+Style/OptionalBooleanParameter:
+  Enabled: false
+
+Style/TrivialAccessors:
+  Exclude:
+    - 'app/controllers/**/*'
+
+Style/IfUnlessModifier:
+  Enabled: false
+
+Style/NegatedIf:
+  Enabled: false
+
+Style/GuardClause:
+  Exclude:
+    - 'app/models/integrations/html.rb'
+
+Style/HashSyntax:
+  EnforcedShorthandSyntax: either
+
+Style/MinMaxComparison:
+  Enabled: false
+
+Metrics/ModuleLength:
+  Max: 300
+
+Metrics/ParameterLists:
+  Enabled: false
+
+Layout/ClassStructure:
+  Enabled: true
+  Categories:
+    module_inclusion:
+      - include
+      - prepend
+      - extend
+  ExpectedOrder:
+    - module_inclusion
+    - constants
+    - public_class_methods
+    - initializer
+    - instance_methods
+    - protected_methods
+    - private_methods
+
+Layout/EndAlignment:
+  EnforcedStyleAlignWith: variable
+
+Layout/MultilineMethodCallIndentation:
+  EnforcedStyle: indented
+
+Layout/CaseIndentation:
+  EnforcedStyle: end
+
+Layout/FirstArrayElementIndentation:
+  EnforcedStyle: consistent
+
+Layout/FirstHashElementIndentation:
+  EnforcedStyle: consistent
+
+Layout/ArgumentAlignment:
+  EnforcedStyle: with_fixed_indentation
+
+Layout/MultilineOperationIndentation:
+  EnforcedStyle: indented
+
+Layout/ArrayAlignment:
+  EnforcedStyle: with_fixed_indentation
+
+Lint/DuplicateBranch:
+  Exclude:
+    - 'app/services/automations/base.rb'
+    - 'app/services/application_service.rb'
+
+Lint/AssignmentInCondition:
+  Enabled: false
+
+Lint/BooleanSymbol:
+  Enabled: false
+
+Lint/UnreachableCode:
+  Exclude:
+    - 'app/workers/start_room_worker.rb'
+    - 'app/workers/send_question_worker.rb'
+    - 'app/workers/send_message_worker.rb'
+    - 'app/workers/meeting/register_now_worker.rb'
+
+Lint/MissingSuper:
+  Exclude:
+    - 'app/services/**/*'
+    - 'app/policies/**/*'
+    - 'lib/**/*'
+
+Lint/EmptyBlock:
+  Exclude:
+    - 'spec/factories/**/*'
+
+Naming/MethodParameterName:
+  MinNameLength: 2
+
+Naming/AccessorMethodName:
+  Enabled: false
+
+Naming/MemoizedInstanceVariableName:
+  Enabled: false
+
+Naming/PredicateName:
+  ForbiddenPrefixes: ['has_', 'have_']
+  Exclude:
+    - 'app/services/export/registrants_sessions.rb'
+
+Naming/BlockForwarding:
+  EnforcedStyle: explicit
+
+# TODO: Enable and fix
+Layout/LineLength:
+  Enabled: false
+  Max: 120
+  AllowedPatterns:
+    - !ruby/regexp /\A +(it|describe|context|shared_examples|include_examples|it_behaves_like) ["']/
+
+Metrics/AbcSize:
+  Enabled: false
+  Max: 20
+
+Style/ClassAndModuleChildren:
+  Enabled: false
+
+Metrics/CyclomaticComplexity:
+  Enabled: false
+
+Metrics/PerceivedComplexity:
+  Enabled: false
+
+Metrics/BlockNesting:
+  Enabled: false
+  Max: 2
+
+Metrics/MethodLength:
+  Enabled: false
+
+Metrics/ClassLength:
+  Enabled: false
+  Max: 200
+
+Metrics/BlockLength:
+  Enabled: false
+
+Style/RescueModifier:
+  Enabled: false
+
+Style/ClassVars:
+  Exclude:
+  - app/models/concerns/settings.rb
+
+Style/OpenStructUse:
+  Exclude:
+  - app/services/integration_subscriber.rb
+  - spec/**/*.rb
+
+Style/TernaryParentheses:
+  Exclude:
+  - config/initializers/devise.rb
+
+Style/RedundantArgument:
+  Enabled: false
