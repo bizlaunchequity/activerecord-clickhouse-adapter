@@ -89,6 +89,22 @@ module ActiveRecord
 
   module ConnectionAdapters
     class ClickhouseColumn < Column
+      attr_reader :nested_name
+
+      def initialize(name, *args)
+        super
+
+        nested_match = name.split(".")
+
+        return unless nested_match.count > 1
+
+        @name = nested_match[1]
+        @nested_name = nested_match[0]
+      end
+
+      def nested?
+        @nested_name.present?
+      end
     end
 
     class ClickhouseAdapter < AbstractAdapter

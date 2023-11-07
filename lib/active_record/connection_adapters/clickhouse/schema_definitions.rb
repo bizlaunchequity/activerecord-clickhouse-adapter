@@ -93,6 +93,10 @@ module ActiveRecord
 
           args.each { |name| column(name, kind, **options.except(:limit)) }
         end
+
+        def valid_column_definition_options
+          super + [:array]
+        end
       end
     end
   end
