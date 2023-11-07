@@ -115,7 +115,8 @@ module ActiveRecord
               end
 
               nested_columns.each do |field, columns|
-                nested_schema = columns.map { |c| "#{c.name} #{c.titleize}" }.join(", ")
+                # TODO: fix titleizing
+                nested_schema = columns.map { |c| "#{c.name} #{c.type.titleize}" }.join(", ")
                 nested_definition = "Nested (#{nested_schema})"
 
                 tbl.print "    t.column #{field.inspect}, #{nested_definition.inspect}"
