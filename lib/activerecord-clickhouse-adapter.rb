@@ -1,5 +1,6 @@
 # frozen_string_literal: true
 
+require_relative "active_record/connection_adapters/clickhouse/version"
 require_relative "active_record/connection_adapters/clickhouse_adapter"
 
 if defined?(Rails::Railtie)
