@@ -9,8 +9,9 @@ require "active_record/connection_adapters/clickhouse/oid/date"
 require "active_record/connection_adapters/clickhouse/oid/date_time"
 require "active_record/connection_adapters/clickhouse/oid/big_integer"
 require "active_record/connection_adapters/clickhouse/oid/uuid"
-require "active_record/connection_adapters/clickhouse/schema_definitions"
+require "active_record/connection_adapters/clickhouse/schema_dumper"
 require "active_record/connection_adapters/clickhouse/schema_creation"
+require "active_record/connection_adapters/clickhouse/schema_definitions"
 require "active_record/connection_adapters/clickhouse/schema_statements"
 require "net/http"
 require "openssl"
@@ -147,8 +148,39 @@ module ActiveRecord
           m.register_type(/Array/) do |sql_type|
             Clickhouse::OID::Array.new(sql_type)
           end
-          register_class_with_limit m, /Bool/, Type::Boolean
-          register_class_with_limit m, /UUID/, Clickhouse::OID::Uuid
+          m.register_type(/Bool/, Type::Boolean)
+          m.register_type(/UUID/, Clickhouse::OID::Uuid)
+        end
+
+        def extract_limit(sql_type)
+          case sql_type
+          when /(Nullable)?\(?String\)?/
+            super("String")
+          when /(Nullable)?\(?U?Int8\)?/
+            1
+          when /(Nullable)?\(?U?Int16\)?/
+            2
+          when /(Nullable)?\(?U?Int32\)?/
+            nil
+          when /(Nullable)?\(?U?Int64\)?/
+            8
+          else
+            super
+          end
+        end
+
+        # `extract_scale` and `extract_precision` are the same as in the Rails abstract base class,
+        # except this permits a space after the comma
+
+        def extract_scale(sql_type)
+          case sql_type
+          when /\((\d+)\)/ then 0
+          when /\((\d+)(,\s?(\d+))\)/ then ::Regexp.last_match(3).to_i
+          end
+        end
+
+        def extract_precision(sql_type)
+          ::Regexp.last_match(1).to_i if sql_type =~ /\((\d+)(,\s?\d+)?\)/
         end
       end
 
@@ -193,45 +225,10 @@ module ActiveRecord
         NATIVE_DATABASE_TYPES
       end
 
-      def valid_type?(type)
-        !native_database_types[type].nil?
-      end
-
-      def extract_limit(sql_type)
-        case sql_type
-        when /(Nullable)?\(?String\)?/
-          super("String")
-        when /(Nullable)?\(?U?Int8\)?/
-          1
-        when /(Nullable)?\(?U?Int16\)?/
-          2
-        when /(Nullable)?\(?U?Int32\)?/
-          nil
-        when /(Nullable)?\(?U?Int64\)?/
-          8
-        else
-          super
-        end
-      end
-
-      # `extract_scale` and `extract_precision` are the same as in the Rails abstract base class,
-      # except this permits a space after the comma
-
-      def extract_scale(sql_type)
-        case sql_type
-        when /\((\d+)\)/ then 0
-        when /\((\d+)(,\s?(\d+))\)/ then ::Regexp.last_match(3).to_i
-        end
-      end
-
-      def extract_precision(sql_type)
-        ::Regexp.last_match(1).to_i if sql_type =~ /\((\d+)(,\s?\d+)?\)/
-      end
-
-      def _quote(value)
+      def quote(value)
         case value
         when Array
-          "[#{value.map { |v| _quote(v) }.join(', ')}]"
+          "[#{value.map { |v| quote(v) }.join(', ')}]"
         else
           super
         end
@@ -269,7 +266,7 @@ module ActiveRecord
       end
 
       def create_schema_dumper(options)
-        SchemaDumper.create(self, options)
+        Clickhouse::SchemaDumper.create(self, options)
       end
 
       # @param [String] table

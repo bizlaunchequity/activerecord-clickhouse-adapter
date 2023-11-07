@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "active_record/connection_adapters/abstract/schema_dumper"
+
 module ActiveRecord
   module ConnectionAdapters
     module Clickhouse
