@@ -114,12 +114,12 @@ module ActiveRecord
                 tbl.puts
               end
 
+              # Adds nested field support
+              # t.nested "nested_field", value: { key: 'String', value: 'String' }, null: false
               nested_columns.each do |field, columns|
-                # TODO: fix titleizing
-                nested_schema = columns.map { |c| "#{c.name} #{c.type.to_s.titleize}" }.join(", ")
-                nested_definition = "Nested (#{nested_schema})"
+                nested_schema = columns.map { |c| "#{c.name}: #{c.param_type.inspect}" }.join(", ")
 
-                tbl.print "    t.column #{field.inspect}, #{nested_definition.inspect}"
+                tbl.print "    t.nested #{field.inspect}, value: { #{nested_schema} }"
                 tbl.print ", null: false"
                 tbl.puts
               end

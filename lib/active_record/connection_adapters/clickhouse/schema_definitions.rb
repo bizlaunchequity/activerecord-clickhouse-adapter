@@ -94,8 +94,20 @@ module ActiveRecord
           args.each { |name| column(name, kind, **options.except(:limit)) }
         end
 
+        def nested(*args, **options)
+          kind = :nested
+
+          unless options[:value].is_a? Hash
+            raise ArgumentError.new("Column #{args.first}: option 'value' must be Hash, got: #{options[:value].class}")
+          end
+
+          options[:value] = options[:value].each_with_object([]) { |(k, v), arr| arr.push("#{k} #{v}") }.join(", ")
+
+          args.each { |name| column(name, kind, **options) }
+        end
+
         def valid_column_definition_options
-          super + [:array]
+          super + [:array, :value]
         end
       end
     end

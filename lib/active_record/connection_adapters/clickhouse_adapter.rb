@@ -89,17 +89,19 @@ module ActiveRecord
 
   module ConnectionAdapters
     class ClickhouseColumn < Column
-      attr_reader :nested_name
+      attr_reader :nested_name, :param_type
 
-      def initialize(name, *args)
+      def initialize(name, _default, sql_type_metadata = nil, *args)
         super
 
         nested_match = name.split(".")
 
         return unless nested_match.count > 1
+        return unless sql_type_metadata
 
         @name = nested_match[1]
         @nested_name = nested_match[0]
+        @param_type = sql_type_metadata.sql_type.match(/Array\((.+)\)/)[1]
       end
 
       def nested?
@@ -125,6 +127,8 @@ module ActiveRecord
 
         enum8: { name: "Enum8" },
         enum16: { name: "Enum16" },
+
+        nested: { name: "Nested" },
 
         int8: { name: "Int8" },
         int16: { name: "Int16" },
