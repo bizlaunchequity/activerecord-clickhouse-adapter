@@ -50,9 +50,9 @@ module ActiveRecord
           return unless table.match(/^\.inner/).nil?
 
           unless simple
-            stream.puts "  # TABLE: #{table}"
+            # stream.puts "  # TABLE: #{table}"
             sql = @connection.show_create_table(table)
-            stream.puts "  # SQL: #{sql.gsub(/ENGINE = Replicated(.*?)\('[^']+',\s*'[^']+',?\s?([^\)]*)?\)/, 'ENGINE = \\1(\\2)')}" if sql
+            # stream.puts "  # SQL: #{sql.gsub(/ENGINE = Replicated(.*?)\('[^']+',\s*'[^']+',?\s?([^\)]*)?\)/, 'ENGINE = \\1(\\2)')}" if sql
             # super(table.gsub(/^\.inner\./, ''), stream)
 
             # detect view table
@@ -61,9 +61,6 @@ module ActiveRecord
 
           # Copy from original dumper
           columns = @connection.columns(table)
-
-          all_nested_columns, columns = columns.partition { |c| c.nested? }
-          nested_columns = all_nested_columns.group_by { |c| c.nested_name }
 
           begin
             tbl = StringIO.new
@@ -111,16 +108,6 @@ module ActiveRecord
                 type, colspec = column_spec(column)
                 tbl.print "    t.#{type} #{column.name.inspect}"
                 tbl.print ", #{format_colspec(colspec)}" if colspec.present?
-                tbl.puts
-              end
-
-              # Adds nested field support
-              # t.nested "nested_field", value: { key: 'String', value: 'String' }, null: false
-              nested_columns.each do |field, columns|
-                nested_schema = columns.map { |c| "#{c.name}: #{c.param_type.inspect}" }.join(", ")
-
-                tbl.print "    t.nested #{field.inspect}, value: { #{nested_schema} }"
-                tbl.print ", null: false"
                 tbl.puts
               end
             end

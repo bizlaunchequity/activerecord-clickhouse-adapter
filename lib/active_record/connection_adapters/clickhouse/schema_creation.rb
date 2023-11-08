@@ -85,7 +85,21 @@ module ActiveRecord
           create_sql << "#{quote_table_name(o.name)} "
           add_to_clause!(create_sql, o) if o.materialized
 
-          statements = o.columns.map { |c| accept c }
+          nested_columns, columns = o.columns.partition { |c| c.name.include?(".") }
+
+          statements = columns.map { |c| accept c }
+
+          nested_statements = nested_columns.group_by { |c| c.name.split(".")[0] }.map do |field, cols|
+            nested_statement = cols.map do |c|
+              c.sql_type = type_to_sql(c.type, **c.options)
+              +"#{quote_column_name(c.name.split('.')[1])} #{c.sql_type}"
+            end
+
+            "#{field} Nested (#{nested_statement.join(', ')})"
+          end
+
+          statements.concat(nested_statements)
+
           statements << accept(o.primary_keys) if o.primary_keys
           create_sql << "(#{statements.join(', ')})" if statements.present?
           # Attach options for only table or materialized view without TO section

@@ -89,24 +89,6 @@ module ActiveRecord
 
   module ConnectionAdapters
     class ClickhouseColumn < Column
-      attr_reader :nested_name, :param_type
-
-      def initialize(name, _default, sql_type_metadata = nil, *args)
-        super
-
-        nested_match = name.split(".")
-
-        return unless nested_match.count > 1
-        return unless sql_type_metadata
-
-        @name = nested_match[1]
-        @nested_name = nested_match[0]
-        @param_type = sql_type_metadata.sql_type.match(/Array\((.+)\)/)[1]
-      end
-
-      def nested?
-        @nested_name.present?
-      end
     end
 
     class ClickhouseAdapter < AbstractAdapter
@@ -127,8 +109,6 @@ module ActiveRecord
 
         enum8: { name: "Enum8" },
         enum16: { name: "Enum16" },
-
-        nested: { name: "Nested" },
 
         int8: { name: "Int8" },
         int16: { name: "Int16" },
@@ -269,6 +249,32 @@ module ActiveRecord
 
       def column_name_for_operation(_operation, node) # :nodoc:
         visitor.compile(node)
+      end
+
+      READ_QUERY = ActiveRecord::ConnectionAdapters::AbstractAdapter.build_read_query_regexp(
+        :close, :declare, :fetch, :move, :set, :show
+      ) # :nodoc:
+      private_constant :READ_QUERY
+
+      def write_query?(sql) # :nodoc:
+        !READ_QUERY.match?(sql)
+      rescue ArgumentError # Invalid encoding
+        !READ_QUERY.match?(sql.b)
+      end
+
+      def raw_execute(sql, name, async: false, allow_retry: false, materialize_transactions: true)
+        log(sql, name, async: async) do
+          with_raw_connection(allow_retry: allow_retry, materialize_transactions: materialize_transactions) do |conn|
+            # TODO
+          end
+        end
+      end
+
+      def reconnect
+        @raw_connection.finish
+        @raw_connection.start
+
+        connect
       end
 
       # Executes insert +sql+ statement in the context of this connection using
@@ -469,6 +475,9 @@ module ActiveRecord
 
         # Use clickhouse default keep_alive_timeout value of 10, rather than Net::HTTP's default of 2
         @connection.keep_alive_timeout = @connection_parameters[:keep_alive_timeout] || 10
+
+        # TODO: add support fot raw connection
+        @raw_connection = @connection
 
         @connection
       end
