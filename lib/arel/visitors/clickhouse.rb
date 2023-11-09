@@ -35,6 +35,15 @@ module Arel
         collector
       end
 
+      def visit_Arel_Nodes_Matches(o, collector)
+        op = o.case_sensitive ? " LIKE " : " ILIKE "
+        collector = infix_value o, collector, op
+
+        # collector = visit o.left, collector
+        # collector << " ILIKE "
+        # collector = visit o.right, collector
+      end
+
       def sanitize_as_setting_value(value)
         if value == :default
           "DEFAULT"
