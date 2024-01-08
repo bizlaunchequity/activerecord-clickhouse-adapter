@@ -73,8 +73,8 @@ module ActiveRecord
           args.each { |name| column(name, kind, **options.except(:precision)) }
         end
 
-        def uuid(*args, **)
-          args.each { |name| column(name, :uuid, **) }
+        def uuid(*args, **options)
+          args.each { |name| column(name, :uuid, **options) }
         end
 
         def enum(*args, **options)
