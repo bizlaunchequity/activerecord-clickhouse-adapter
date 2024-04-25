@@ -27,21 +27,24 @@ module ActiveRecord
         end
 
         def delete_version(version)
-          insert_manager = ::Arel::InsertManager.new
-          insert_manager.insert([[arel_table[:version], version], [arel_table[:active], 0]])
-
-          connection.do_execute(insert_manager.to_sql, "#{self.class} Destroy", format: nil)
+          im = ::Arel::InsertManager.new(arel_table)
+          im.insert(arel_table[primary_key] => version.to_s, arel_table['active'] => 0)
+          connection.insert(im, "#{self.class} Create Rollback Version", primary_key, version)
         end
 
-        def versions
-          table = arel_table.dup
-          table.final = true
+        # def versions
+        #   table = arel_table.dup
+        #   table.final = true
 
-          sm = ::Arel::SelectManager.new(table)
-          sm.project(table[primary_key]).where(table[:active].eq(1))
-          sm.order(table[primary_key].asc)
+        #   sm = ::Arel::SelectManager.new(table)
+        #   sm.project(table[primary_key]).where(table[:active].eq(1))
+        #   sm.order(table[primary_key].asc)
 
-          connection.select_values(sm, "#{self.class} Load")
+        #   connection.select_values(sm, "#{self.class} Load")
+        # end
+
+        def all_versions
+          final.where(active: 1).order(:version).pluck(:version)
         end
       end
 
@@ -73,16 +76,14 @@ module ActiveRecord
         private
 
         def select_entry(key)
-          table = arel_table.dup
-          table.final = true
-
-          sm = ::Arel::SelectManager.new(table)
-          sm.project(::Arel::Nodes::SqlLiteral.new("*"))
-          sm.where(table[primary_key].eq(::Arel::Nodes::BindParam.new(key)))
-          sm.order(table[primary_key].asc)
+          sm = ::Arel::SelectManager.new(arel_table)
+          sm.final! if connection.table_options(table_name)[:options] =~ /^ReplacingMergeTree/
+          sm.project(::Arel.star)
+          sm.where(arel_table[primary_key].eq(::Arel::Nodes::BindParam.new(key)))
+          sm.order(arel_table[primary_key].asc)
           sm.limit = 1
 
-          connection.select_all(sm, "#{self.class} Load").first
+          connection.select_one(sm, "#{self.class} Load")
         end
 
         def update_entry(key, new_value)

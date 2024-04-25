@@ -1,7 +1,9 @@
 # frozen_string_literal: true
 
 require "arel/visitors/clickhouse"
+require "arel/nodes/final"
 require "arel/nodes/settings"
+require "arel/nodes/using"
 require "active_record/connection_adapters"
 require "active_record/connection_adapters/clickhouse/migration"
 require "active_record/connection_adapters/clickhouse/oid/array"
@@ -50,7 +52,6 @@ module ActiveRecord
       clickhouse_adapdated_class.new(
         logger,
         connection,
-        { user: config[:username], password: config[:password], database: database }.compact,
         config
       )
     end
@@ -70,7 +71,7 @@ module ActiveRecord
 
   module ModelSchema
     module ClassMethods
-      delegate :final, :settings, to: :all
+      delegate :final, :final!, :settings, :settings!, to: :all
 
       def is_view
         @is_view || false
@@ -84,6 +85,11 @@ module ActiveRecord
       # def arel_table # :nodoc:
       #   @arel_table ||= Arel::Table.new(table_name, type_caster: type_caster)
       # end
+
+      def _delete_record(constraints)
+        raise ActiveRecord::ActiveRecordError.new('Deleting a row is not possible without a primary key') unless self.primary_key
+        super
+      end
     end
   end
 
@@ -125,6 +131,37 @@ module ActiveRecord
       }.freeze
 
       class << self
+        def extract_limit(sql_type) # :nodoc:
+          case sql_type
+            when /(Nullable)?\(?String\)?/
+              super('String')
+            when /(Nullable)?\(?U?Int8\)?/
+              1
+            when /(Nullable)?\(?U?Int16\)?/
+              2
+            when /(Nullable)?\(?U?Int32\)?/
+              nil
+            when /(Nullable)?\(?U?Int64\)?/
+              8
+            else
+              super
+          end
+        end
+
+        # `extract_scale` and `extract_precision` are the same as in the Rails abstract base class,
+        # except this permits a space after the comma
+
+        def extract_scale(sql_type)
+          case sql_type
+          when /\((\d+)\)/ then 0
+          when /\((\d+)(,\s?(\d+))\)/ then $3.to_i
+          end
+        end
+
+        def extract_precision(sql_type)
+          $1.to_i if sql_type =~ /\((\d+)(,\s?\d+)?\)/
+        end
+
         private
 
         def initialize_type_map(m) # :nodoc:
@@ -151,37 +188,6 @@ module ActiveRecord
           m.register_type(/Bool/, Type::Boolean.new)
           m.register_type(/UUID/, Clickhouse::OID::Uuid.new)
         end
-
-        def extract_limit(sql_type)
-          case sql_type
-          when /(Nullable)?\(?String\)?/
-            super("String")
-          when /(Nullable)?\(?U?Int8\)?/
-            1
-          when /(Nullable)?\(?U?Int16\)?/
-            2
-          when /(Nullable)?\(?U?Int32\)?/
-            nil
-          when /(Nullable)?\(?U?Int64\)?/
-            8
-          else
-            super
-          end
-        end
-
-        # `extract_scale` and `extract_precision` are the same as in the Rails abstract base class,
-        # except this permits a space after the comma
-
-        def extract_scale(sql_type)
-          case sql_type
-          when /\((\d+)\)/ then 0
-          when /\((\d+)(,\s?(\d+))\)/ then ::Regexp.last_match(3).to_i
-          end
-        end
-
-        def extract_precision(sql_type)
-          ::Regexp.last_match(1).to_i if sql_type =~ /\((\d+)(,\s?\d+)?\)/
-        end
       end
 
       TYPE_MAP = Type::TypeMap.new.tap { |m| initialize_type_map(m) }
@@ -189,12 +195,12 @@ module ActiveRecord
       attr_reader :full_config
 
       # Initializes and connects a Clickhouse adapter.
-      def initialize(logger, connection_parameters, config, full_config)
+      def initialize(logger, connection_parameters, config)
         super(nil, logger)
         @connection_parameters = connection_parameters
+        @connection_config = { user: config[:username], password: config[:password], database: config[:database] }.compact
+        @debug = config[:debug] || false
         @config = config
-        @debug = full_config[:debug] || false
-        @full_config = full_config
 
         @prepared_statements = false
 
@@ -210,7 +216,7 @@ module ActiveRecord
       end
 
       def migrations_paths
-        @full_config[:migrations_paths] || "db/migrate_clickhouse"
+        @config[:migrations_paths] || 'db/migrate_clickhouse'
       end
 
       def arel_visitor
@@ -306,8 +312,8 @@ module ActiveRecord
       def create_database(name)
         sql = apply_cluster "CREATE DATABASE #{quote_table_name(name)}"
         log_with_debug(sql, adapter_name) do
-          res = @connection.post("/?#{@config.except(:database).to_param}", sql)
-          process_response(res)
+          res = @connection.post("/?#{@connection_config.except(:database).to_param}", sql)
+          process_response(res, DEFAULT_RESPONSE_FORMAT)
         end
       end
 
@@ -343,16 +349,27 @@ module ActiveRecord
         raise "Set a cluster" unless cluster
 
         distributed_options =
-          "Distributed(#{cluster}, #{@config[:database]}, #{table_name}, #{sharding_key})"
+          "Distributed(#{cluster}, #{@connection_config[:database]}, #{table_name}, #{sharding_key})"
         create_table(distributed_table_name, **options.merge(options: distributed_options), &block)
+      end
+
+      def create_function(name, body)
+        fd = "CREATE FUNCTION #{apply_cluster(quote_table_name(name))} AS #{body}"
+        do_execute(fd, format: nil)
       end
 
       # Drops a ClickHouse database.
       def drop_database(name)
         sql = apply_cluster "DROP DATABASE IF EXISTS #{quote_table_name(name)}"
         log_with_debug(sql, adapter_name) do
-          res = @connection.post("/?#{@config.except(:database).to_param}", sql)
-          process_response(res)
+          res = @connection.post("/?#{@connection_config.except(:database).to_param}", sql)
+          process_response(res, DEFAULT_RESPONSE_FORMAT)
+        end
+      end
+
+      def drop_functions
+        functions.each do |function|
+          drop_function(function)
         end
       end
 
@@ -361,12 +378,30 @@ module ActiveRecord
       end
 
       def drop_table(table_name, options = {}) # :nodoc:
-        do_execute apply_cluster "DROP TABLE#{' IF EXISTS' if options[:if_exists]} #{quote_table_name(table_name)}"
+        # do_execute apply_cluster "DROP TABLE#{' IF EXISTS' if options[:if_exists]} #{quote_table_name(table_name)}"
+
+        query = "DROP TABLE"
+        query = "#{query} IF EXISTS " if options[:if_exists]
+        query = "#{query} #{quote_table_name(table_name)}"
+        query = apply_cluster(query)
+        query = "#{query} SYNC" if options[:sync]
+
+        do_execute(query)
 
         return unless options[:with_distributed]
 
         distributed_table_name = options.delete(:with_distributed)
         drop_table(distributed_table_name, **options)
+      end
+
+      def drop_function(name, options = {})
+        query = "DROP FUNCTION"
+        query = "#{query} IF EXISTS " if options[:if_exists]
+        query = "#{query} #{quote_table_name(name)}"
+        query = apply_cluster(query)
+        query = "#{query} SYNC" if options[:sync]
+
+        do_execute(query, format: nil)
       end
 
       def add_column(table_name, column_name, type, **options)
@@ -383,8 +418,8 @@ module ActiveRecord
         execute("ALTER TABLE #{quote_table_name(table_name)} #{remove_column_for_alter(table_name, column_name, type, **options)}", nil, settings: { wait_end_of_query: 1, send_progress_in_http_headers: 1 })
       end
 
-      def change_column(table_name, column_name, type, options = {})
-        result = do_execute("ALTER TABLE #{quote_table_name(table_name)} #{change_column_for_alter(table_name, column_name, type, options)}", nil, settings: { wait_end_of_query: 1, send_progress_in_http_headers: 1 })
+      def change_column(table_name, column_name, type, **options)
+        result = do_execute("ALTER TABLE #{quote_table_name(table_name)} #{change_column_for_alter(table_name, column_name, type, **options)}", nil, settings: {wait_end_of_query: 1, send_progress_in_http_headers: 1})
         raise "Error parse json response: #{result}" if result.presence && !result.is_a?(Hash)
       end
 
@@ -399,16 +434,21 @@ module ActiveRecord
         change_column table_name, column_name, nil, { default: default }.compact
       end
 
+      def remove_index(table_name, name)
+        query = apply_cluster("ALTER TABLE #{quote_table_name(table_name)}")
+        execute "#{query} DROP INDEX #{quote_column_name(name)}"
+      end
+
       def cluster
-        @full_config[:cluster_name]
+        @config[:cluster_name]
       end
 
       def replica
-        @full_config[:replica_name]
+        @config[:replica_name]
       end
 
       def use_default_replicated_merge_tree_params?
-        database_engine_atomic? && @full_config[:use_default_replicated_merge_tree_params]
+        database_engine_atomic? && @config[:use_default_replicated_merge_tree_params]
       end
 
       def use_replica?
@@ -416,7 +456,7 @@ module ActiveRecord
       end
 
       def replica_path(table)
-        "/clickhouse/tables/#{cluster}/{uuid}/#{@config[:database]}.#{table}"
+        "/clickhouse/tables/#{cluster}/{uuid}/#{@connection_config[:database]}.#{table}"
       end
 
       def database_engine_atomic?
@@ -458,9 +498,9 @@ module ActiveRecord
         result
       end
 
-      def change_column_for_alter(table_name, column_name, type, options = {})
+      def change_column_for_alter(table_name, column_name, type, **options)
         td = create_table_definition(table_name)
-        cd = td.new_column_definition(column_name, type, options)
+        cd = td.new_column_definition(column_name, type, **options)
         schema_creation.accept(ChangeColumnDefinition.new(cd, column_name))
       end
 

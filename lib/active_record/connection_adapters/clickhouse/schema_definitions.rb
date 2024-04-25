@@ -70,7 +70,7 @@ module ActiveRecord
             options[:value] = options[:precision]
           end
 
-          args.each { |name| column(name, kind, **options.except(:precision)) }
+          args.each { |name| column(name, kind, **options) }
         end
 
         def uuid(*args, **options)
@@ -109,6 +109,21 @@ module ActiveRecord
         def valid_column_definition_options
           super + [:array, :value]
         end
+      end
+
+      class IndexDefinition
+        attr_reader :table, :name, :expression, :type, :granularity, :first, :after
+
+        def initialize(table, name, expression, type, granularity, first:, after:)
+          @table = table
+          @name = name
+          @expression = expression
+          @type = type
+          @granularity = granularity
+          @first = first
+          @after = after
+        end
+
       end
     end
   end

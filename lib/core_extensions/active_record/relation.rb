@@ -2,15 +2,35 @@ module CoreExtensions
   module ActiveRecord
     module Relation
       def settings(**opts)
-        check_command("SETTINGS")
+        spawn.settings!(**opts)
+      end
+
+      def settings!(**opts)
+        assert_mutability!
+        check_command('SETTINGS')
         @values[:settings] = (@values[:settings] || {}).merge opts
         self
       end
 
       def final(final = true)
-        check_command("FINAL")
-        @table = @table.dup
-        @table.final = final
+        spawn.final!
+      end
+
+      def final!
+        assert_mutability!
+        check_command('FINAL')
+        @values[:final] = true
+        self
+      end
+
+      def using(*opts)
+        spawn.using!(*opts)
+      end
+
+      # @param [Array] opts
+      def using!(*opts)
+        assert_mutability!
+        @values[:using] = opts
         self
       end
 
@@ -23,7 +43,9 @@ module CoreExtensions
       def build_arel(aliases = nil)
         arel = super
 
+        arel.final! if @values[:final].present?
         arel.settings(@values[:settings]) if @values[:settings].present?
+        arel.using(@values[:using]) if @values[:using].present?
 
         arel
       end
