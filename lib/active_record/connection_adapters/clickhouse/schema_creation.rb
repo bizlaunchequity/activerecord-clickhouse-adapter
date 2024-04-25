@@ -101,6 +101,14 @@ module ActiveRecord
           statements.concat(nested_statements)
 
           statements << accept(o.primary_keys) if o.primary_keys
+
+          if supports_indexes_in_create?
+            indexes = o.indexes.map do |expression, options|
+              accept(@conn.add_index_options(o.name, expression, **options))
+            end
+            statements.concat(indexes)
+          end
+
           create_sql << "(#{statements.join(', ')})" if statements.present?
           # Attach options for only table or materialized view without TO section
           add_table_options!(create_sql, o) if !o.view || (o.view && o.materialized && !o.to)
@@ -116,7 +124,7 @@ module ActiveRecord
 
         def visit_ChangeColumnDefinition(o)
           column = o.column
-          column.sql_type = type_to_sql(column.type, column.options)
+          column.sql_type = type_to_sql(column.type, **column.options)
           options = column_options(column)
 
           quoted_column_name = quote_column_name(o.name)
@@ -132,12 +140,21 @@ module ActiveRecord
           change_column_sql
         end
 
+        def visit_IndexDefinition(o, create = false)
+          sql = create ? ["ALTER TABLE #{quote_table_name(o.table)} ADD"] : []
+          sql << "INDEX #{quote_column_name(o.name)} (#{o.expression}) TYPE #{o.type} GRANULARITY #{o.granularity}"
+          sql << "FIRST #{quote_column_name(o.first)}" if o.first
+          sql << "AFTER #{quote_column_name(o.after)}" if o.after
+
+          sql.join(' ')
+        end
+
+        def visit_CreateIndexDefinition(o)
+          visit_IndexDefinition(o.index, true)
+        end
+
         def current_database
-          if ActiveRecord.version >= Gem::Version.new("6")
-            ActiveRecord::Base.connection_db_config.database
-          else
-            ActiveRecord::Base.connection_config[:database]
-          end
+          ActiveRecord::Base.connection_db_config.database
         end
       end
     end

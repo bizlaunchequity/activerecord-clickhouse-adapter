@@ -12,14 +12,41 @@ module Arel
         end
       end
 
-      def visit_Arel_Table(o, collector)
-        collector = super
-        collector << ' FINAL ' if o.final
-        collector
+      def update_or_delete(value)
+        check = ->(v) { v.start_with?('DELETE FROM ') || v.include?(' UPDATE ') }
+
+        case value
+        when String
+          check[value]
+        when Array
+          value.flatten.any? { |v| check[v] }
+        end
+      end
+
+      def visit_Arel_Attributes_Attribute(o, collector)
+        collector << quote_table_name(o.relation.table_alias || o.relation.name) << '.' if !update_or_delete(collector.value)
+        collector << quote_column_name(o.name)
       end
 
       def visit_Arel_Nodes_SelectOptions(o, collector)
         maybe_visit o.settings, super
+      end
+
+      def visit_Arel_Nodes_UpdateStatement(o, collector)
+        o = prepare_update_statement(o)
+
+        collector << 'ALTER TABLE '
+        collector = visit o.relation, collector
+        collect_nodes_for o.values, collector, ' UPDATE '
+        collect_nodes_for o.wheres, collector, ' WHERE ', ' AND '
+        collect_nodes_for o.orders, collector, ' ORDER BY '
+        maybe_visit o.limit, collector
+      end
+
+      def visit_Arel_Nodes_Final(o, collector)
+        visit o.expr, collector
+        collector << ' FINAL'
+        collector
       end
 
       def visit_Arel_Nodes_Settings(o, collector)
@@ -42,6 +69,22 @@ module Arel
         # collector = visit o.left, collector
         # collector << " ILIKE "
         # collector = visit o.right, collector
+      end
+
+      def visit_Arel_Nodes_Using o, collector
+        collector << "USING "
+        visit o.expr, collector
+        collector
+      end
+
+      def visit_Arel_Nodes_Matches(o, collector)
+        op = o.case_sensitive ? " LIKE " : " ILIKE "
+        infix_value o, collector, op
+      end
+
+      def visit_Arel_Nodes_DoesNotMatch(o, collector)
+        op = o.case_sensitive ? " NOT LIKE " : " NOT ILIKE "
+        infix_value o, collector, op
       end
 
       def sanitize_as_setting_value(value)

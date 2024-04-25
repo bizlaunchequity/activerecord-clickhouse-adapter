@@ -39,12 +39,24 @@ module ActiveRecord
         end
 
         def tables(stream)
-          sorted_tables = @connection.tables.sort { |a, b| @connection.show_create_table(a).match(/^CREATE\s+(MATERIALIZED\s+)?VIEW/) ? 1 : a <=> b }
+          # sorted_tables = @connection.tables.sort { |a, b| @connection.show_create_table(a).match(/^CREATE\s+(MATERIALIZED\s+)?VIEW/) ? 1 : a <=> b }
 
+          # sorted_tables.each do |table_name|
+          #   table(table_name, stream) unless ignored?(table_name)
+          # end
+
+          functions = @connection.functions
+          functions.each do |function|
+            function(function, stream)
+          end
+
+          sorted_tables = @connection.tables.sort {|a,b| @connection.show_create_table(a).match(/^CREATE\s+(MATERIALIZED\s+)?VIEW/) ? 1 : a <=> b }
           sorted_tables.each do |table_name|
             table(table_name, stream) unless ignored?(table_name)
           end
         end
+
+
 
         def table(table, stream)
           return unless table.match(/^\.inner/).nil?
@@ -124,6 +136,13 @@ module ActiveRecord
             stream.puts "#   #{e.message}"
             stream.puts
           end
+        end
+
+        def function(function, stream)
+          stream.puts "  # FUNCTION: #{function}"
+          sql = @connection.show_create_function(function)
+          stream.puts "  # SQL: #{sql}" if sql
+          stream.puts "  create_function \"#{function}\", \"#{sql.gsub(/^CREATE FUNCTION (.*?) AS/, '').strip}\"" if sql
         end
 
         def format_options(options)
