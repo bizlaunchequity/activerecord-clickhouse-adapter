@@ -44,6 +44,11 @@ module Arel
         # collector = visit o.right, collector
       end
 
+      def visit_Arel_Nodes_DoesNotMatch(o, collector)
+        op = o.case_sensitive ? " NOT LIKE " : " NOT ILIKE "
+        collector = infix_value o, collector, op
+      end
+
       def sanitize_as_setting_value(value)
         if value == :default
           "DEFAULT"
